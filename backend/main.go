@@ -220,6 +220,10 @@ func getProgramWeeksHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func cleanString(s string) string {
+	return strings.Trim(s, " `\"'\n\r\t")
+}
+
 // getWorkoutPlanHandler məşq planını və detallarını qaytarır
 func getWorkoutPlanHandler(w http.ResponseWriter, r *http.Request) {
 	workoutId := r.URL.Query().Get("workoutId")
@@ -307,11 +311,16 @@ func getWorkoutPlanHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				log.Printf("Fetched details for %s (VideoURL present: %v)", exName, detail.VideoURL != "")
 				
+				// Clean all URL fields
+				detail.VideoURL = cleanString(detail.VideoURL)
+				detail.MainImage = cleanString(detail.MainImage)
+				detail.ImageURL = cleanString(detail.ImageURL)
+
 				// Clean muscle group images
 				if len(detail.MuscleGroups) > 0 {
 					for i, mg := range detail.MuscleGroups {
 						if mg.ImageURL != "" {
-							detail.MuscleGroups[i].ImageURL = strings.Trim(mg.ImageURL, " `\"'")
+							detail.MuscleGroups[i].ImageURL = cleanString(mg.ImageURL)
 						}
 					}
 				}

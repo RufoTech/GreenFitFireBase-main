@@ -9,6 +9,7 @@ import {
   Dimensions,
   Image,
   ImageBackground,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -16,7 +17,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
@@ -53,12 +54,13 @@ interface WorkoutPlanItem {
 export default function LiveWorkoutScreen() {
   const router = useRouter();
   const { workoutId } = useLocalSearchParams();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   
   const [loading, setLoading] = useState(true);
   const [workoutName, setWorkoutName] = useState("");
   const [exercises, setExercises] = useState<ExerciseDetail[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isMuscleModalVisible, setIsMuscleModalVisible] = useState(false);
 
   useEffect(() => {
     fetchWorkoutData();
@@ -175,11 +177,23 @@ export default function LiveWorkoutScreen() {
     );
   }
 
+  // Helper to clean any URL
+  const cleanUrl = (url: string | undefined) => {
+    if (!url) return null;
+    return url.replace(/[`"'\s]/g, "");
+  };
+
   const currentExercise = exercises[currentIndex];
   const progressPercent = Math.round((currentIndex / exercises.length) * 100);
   
   const videoId = currentExercise.videoUrl ? getYoutubeId(currentExercise.videoUrl) : null;
+  const mainImage = cleanUrl(currentExercise.mainImage);
   
+  // Get target muscle image (first one)
+  const targetMuscleImage = currentExercise.muscleGroups && currentExercise.muscleGroups.length > 0 
+      ? cleanUrl(currentExercise.muscleGroups[0].imageUrl)
+      : null;
+
   // Create Plyr HTML
   const plyrHTML = `
     <!DOCTYPE html>
@@ -213,11 +227,6 @@ export default function LiveWorkoutScreen() {
     </html>
   `;
   
-  // Get target muscle image (first one)
-  const targetMuscleImage = currentExercise.muscleGroups && currentExercise.muscleGroups.length > 0 
-      ? currentExercise.muscleGroups[0].imageUrl 
-      : null;
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={BG_DARK} />
@@ -272,7 +281,7 @@ export default function LiveWorkoutScreen() {
                 </View>
             ) : (
                 <ImageBackground
-                    source={{ uri: currentExercise.mainImage || 'https://via.placeholder.com/400x225?text=No+Image' }}
+                    source={{ uri: mainImage || 'https://via.placeholder.com/400x225?text=No+Image' }}
                     style={styles.videoThumbnail}
                     imageStyle={{ opacity: 0.8 }}
                 >
@@ -321,30 +330,40 @@ export default function LiveWorkoutScreen() {
 
         {/* Muscle Map Section */}
         {currentExercise.muscleGroups && currentExercise.muscleGroups.length > 0 && (
-            <View style={styles.muscleMapCard}>
-                <View style={styles.muscleMapContainer}>
-                    {targetMuscleImage ? (
-                         <Image 
-                            source={{ uri: targetMuscleImage }}
-                            style={styles.muscleMapImage}
-                        />
-                    ) : (
-                        <MaterialIcons name="accessibility" size={60} color="rgba(255,255,255,0.4)" />
-                    )}
-                </View>
-                <View style={styles.muscleInfo}>
-                    <Text style={styles.muscleInfoTitle}>Target Muscles</Text>
-                    <View style={styles.muscleTags}>
-                        {currentExercise.muscleGroups.map((muscle, idx) => (
-                            <View key={idx} style={[styles.muscleTag, { backgroundColor: idx === 0 ? PRIMARY : '#1e293b' }]}>
-                                <Text style={[styles.muscleTagText, { color: idx === 0 ? BG_DARK : '#94a3b8' }]}>
-                                    {muscle.name.toUpperCase()}
-                                </Text>
-                            </View>
-                        ))}
+            <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => setIsMuscleModalVisible(true)}
+                style={styles.muscleMapCard}
+            >
+                <View style={styles.muscleMapCardHeader}>
+                    <View style={styles.muscleMapContainer}>
+                        {targetMuscleImage ? (
+                             <Image 
+                                source={{ uri: targetMuscleImage }}
+                                style={styles.muscleMapImage}
+                                resizeMode="contain"
+                            />
+                        ) : (
+                            <MaterialIcons name="accessibility" size={60} color="rgba(255,255,255,0.4)" />
+                        )}
+                    </View>
+                    <View style={styles.muscleInfo}>
+                        <Text style={styles.muscleInfoTitle}>Target Muscles</Text>
+                        <View style={styles.muscleTags}>
+                            {currentExercise.muscleGroups.map((muscle, idx) => (
+                                <View key={idx} style={[styles.muscleTag, { backgroundColor: idx === 0 ? PRIMARY : '#1e293b' }]}>
+                                    <Text style={[styles.muscleTagText, { color: idx === 0 ? BG_DARK : '#94a3b8' }]}>
+                                        {muscle.name.toUpperCase()}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                    <View style={styles.infoIconContainer}>
+                        <MaterialIcons name="info-outline" size={24} color={PRIMARY} />
                     </View>
                 </View>
-            </View>
+            </TouchableOpacity>
         )}
 
         {/* Workout List Section */}
@@ -411,6 +430,50 @@ export default function LiveWorkoutScreen() {
             </TouchableOpacity>
         </View>
       </View>
+
+      {/* Muscle Detail Modal */}
+      <Modal
+        visible={isMuscleModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsMuscleModalVisible(false)}
+      >
+        <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setIsMuscleModalVisible(false)}
+        >
+            <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Target Muscles</Text>
+                    <TouchableOpacity onPress={() => setIsMuscleModalVisible(false)}>
+                        <MaterialIcons name="close" size={24} color={TEXT_COLOR} />
+                    </TouchableOpacity>
+                </View>
+                
+                {targetMuscleImage && (
+                    <View style={styles.modalImageContainer}>
+                        <Image 
+                            source={{ uri: targetMuscleImage }}
+                            style={styles.modalImage}
+                            resizeMode="contain"
+                        />
+                    </View>
+                )}
+
+                <View style={styles.modalMuscleList}>
+                    {currentExercise.muscleGroups && currentExercise.muscleGroups.map((muscle, idx) => (
+                        <View key={idx} style={styles.modalMuscleItem}>
+                            <View style={[styles.modalDot, { backgroundColor: idx === 0 ? PRIMARY : SUBTEXT_COLOR }]} />
+                            <Text style={[styles.modalMuscleText, { color: idx === 0 ? PRIMARY : TEXT_COLOR }]}>
+                                {muscle.name}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -642,10 +705,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(204, 255, 0, 0.1)',
     borderRadius: 12,
     padding: 16,
+    marginBottom: 32,
+  },
+  muscleMapCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 24,
-    marginBottom: 32,
+  },
+  infoIconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
   },
   muscleMapContainer: {
     width: 80,
@@ -658,10 +728,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   muscleMapImage: {
-    width: 60,
-    height: 100,
-    opacity: 0.4,
-    tintColor: '#fff',
+    width: '100%',
+    height: '100%',
   },
   highlight: {
     position: 'absolute',
@@ -693,6 +761,61 @@ const styles = StyleSheet.create({
   muscleTagText: {
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: BORDER_DARK,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: TEXT_COLOR,
+  },
+  modalImageContainer: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalMuscleList: {
+    gap: 12,
+  },
+  modalMuscleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  modalMuscleText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   workoutListSection: {
     marginTop: 8,
