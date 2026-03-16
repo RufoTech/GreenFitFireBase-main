@@ -136,6 +136,7 @@ export default function WeeklyProgramScreen() {
           }
 
           return {
+              id: item.id, // Add ID field
               day: item.day,
               title: item.title,
               type: item.type || 'workout',
